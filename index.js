@@ -24,12 +24,13 @@ const verifyToken = async (req, res, next) => {
   //token get from cookies
   const token = req.cookies?.token;
   //console.log('token inside middleware: ',token);
+
   if (!token) {
-    res.staus(401).send({ message: "Unauthorised Access" });
+    return res.status(401).send({ message: "Unauthorised Access" });
   }
   jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
     if (err) {
-      res.staus(401).send({ message: "Forbidden Access" });
+      return res.status(401).send({ message: "Unauthorised Access" });
     }
 
     req.decodedUser = decoded;
@@ -64,6 +65,23 @@ async function run() {
     const carts = database.collection("carts");
     const users = database.collection("users");
 
+    //verify Admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decodedUser?.email
+      //console.log(email);
+      let query = { email: email };
+      
+      const user = await users.findOne(query);
+     
+      const isAdmin = user?.role === 'Admin'
+     
+      if (!isAdmin) {
+        return res.status(403).send({status: "forbidden Access"})
+      }
+
+      next()
+    };
+
     //jwt post api endpoint
     app.post("/api/v1/jwt", (req, res) => {
       const user = req.body;
@@ -72,12 +90,36 @@ async function run() {
         expiresIn: "1h",
       });
       //token set into cookies
+
       res
         .cookie("token", token, {
           httpOnly: true,
           secure: false,
         })
         .send({ staus: true });
+    });
+
+    //admin api endpoint
+    app.get("/api/v1/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      //console.log(email,req.decodedUser?.email);
+      if (req.decodedUser?.email !== email) {
+        return res.status(403).send({ status: "forbidden Access" });
+      }
+
+      let query = { email: email };
+
+      //find user by query
+      const user = await users.findOne(query);
+
+      // //make a admin false initially
+      let isAdmin = false;
+
+      if (user) {
+        isAdmin = user?.role === "Admin";
+      }
+
+      res.send({ isAdmin: isAdmin });
     });
 
     //count menus for pagination
@@ -99,16 +141,19 @@ async function run() {
     });
 
     //users api endpoint
-    app.get("/api/v1/users", async (req, res) => {
+    app.get("/api/v1/users",verifyToken,verifyAdmin,async (req, res) => {
       const result = await users.find().toArray();
       res.send(result);
     });
 
     //carts api endpoint
-    app.get("/api/v1/carts",verifyToken, async (req, res) => {
+    app.get("/api/v1/carts", verifyToken, async (req, res) => {
       const { email } = req.query;
-      const userDecoded = req.decodedUser
 
+      //console.log(userDecoded);
+      if (req.decodedUser?.email !== email) {
+        return res.status(403).send({ status: "forbidden Access" });
+      }
       let query = {
         email: email,
       };
@@ -117,21 +162,21 @@ async function run() {
     });
 
     //single cart api endpoint
-    app.get("/api/v1/carts/:id", async (req, res) => {
+    app.get("/api/v1/carts/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await carts.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
     //single user api endpoint
-    app.get("/api/v1/users/:id", async (req, res) => {
+    app.get("/api/v1/users/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await users.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
     //cart post api endpoint
-    app.post("/api/v1/carts", async (req, res) => {
+    app.post("/api/v1/carts",verifyToken, async (req, res) => {
       const cart = req.body;
       const result = await carts.insertOne(cart);
       res.send(result);
@@ -154,7 +199,7 @@ async function run() {
     });
 
     //users update api endpoint
-    app.patch("/api/v1/users/:email", async (req, res) => {
+    app.patch("/api/v1/users/:email",verifyToken,verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const updates = req.body;
       const filter = { email: email };
@@ -163,14 +208,14 @@ async function run() {
     });
 
     //cart delete api endpoint
-    app.delete("/api/v1/carts/:id", async (req, res) => {
+    app.delete("/api/v1/carts/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await carts.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
     //user delete api endpoint
-    app.delete("/api/v1/users/:id", async (req, res) => {
+    app.delete("/api/v1/users/:id",verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       console.log(id);
       const result = await users.deleteOne({ _id: new ObjectId(id) });
