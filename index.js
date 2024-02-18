@@ -6,8 +6,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 
+
 //dotenv
 require("dotenv").config();
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 //middleware
 app.use(
@@ -67,19 +70,19 @@ async function run() {
 
     //verify Admin
     const verifyAdmin = async (req, res, next) => {
-      const email = req.decodedUser?.email
+      const email = req.decodedUser?.email;
       //console.log(email);
       let query = { email: email };
-      
+
       const user = await users.findOne(query);
-     
-      const isAdmin = user?.role === 'Admin'
-     
+
+      const isAdmin = user?.role === "Admin";
+
       if (!isAdmin) {
-        return res.status(403).send({status: "forbidden Access"})
+        return res.status(403).send({ status: "forbidden Access" });
       }
 
-      next()
+      next();
     };
 
     //jwt post api endpoint
@@ -134,6 +137,26 @@ async function run() {
       res.send(result);
     });
 
+    //PAYMENT-INTENT API   ENDPOINT
+    app.post("/api/v1/create-payment-intent",verifyToken, async (req, res) => {
+      //get price from body
+      const { price } = req.body;
+    
+      //price into poisha
+      const amount = parseInt(price * 100);
+      console.log(amount,146);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
     //reviews api endpoint
     app.get("/api/v1/reviews", async (req, res) => {
       const result = await reviews.find().toArray();
@@ -141,44 +164,55 @@ async function run() {
     });
 
     //users api endpoint
-    app.get("/api/v1/users",verifyToken,verifyAdmin,async (req, res) => {
+    app.get("/api/v1/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await users.find().toArray();
       res.send(result);
     });
 
     //carts api endpoint
     app.get("/api/v1/carts", verifyToken, async (req, res) => {
-      const { email } = req.query;
-
-      //console.log(userDecoded);
-      if (req.decodedUser?.email !== email) {
-        return res.status(403).send({ status: "forbidden Access" });
+      let { email } = req.query;
+      let result;
+      if (!email) {
+        return res.status(400).send({ error: "Email is required" });
       }
-      let query = {
-        email: email,
-      };
-      const result = await carts.find(query).toArray();
+      if (req.decodedUser?.email === email) {
+        console.log("match");
+        result = await carts.find({ email: email }).toArray();
+      } else {
+        res.status(403).send({ status: "unauthorized" });
+      }
       res.send(result);
     });
 
     //single cart api endpoint
-    app.get("/api/v1/carts/:id",verifyToken, async (req, res) => {
+    app.get("/api/v1/carts/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await carts.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
+ 
+    
 
     //single user api endpoint
-    app.get("/api/v1/users/:id",verifyToken, async (req, res) => {
+    app.get("/api/v1/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const result = await users.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
     //cart post api endpoint
-    app.post("/api/v1/carts",verifyToken, async (req, res) => {
+    app.post("/api/v1/carts", async (req, res) => {
       const cart = req.body;
       const result = await carts.insertOne(cart);
+      res.send(result);
+    });
+
+    //menus post api endpoint
+    app.post("/api/v1/menus", verifyToken, verifyAdmin, async (req, res) => {
+      const menu = req.body;
+      console.log(menu);
+      const result = await menus.insertOne(menu);
       res.send(result);
     });
 
@@ -199,7 +233,7 @@ async function run() {
     });
 
     //users update api endpoint
-    app.patch("/api/v1/users/:email",verifyToken,verifyAdmin, async (req, res) => {
+    app.patch("/api/v1/users/:email", async (req, res) => {
       const email = req.params.email;
       const updates = req.body;
       const filter = { email: email };
@@ -207,20 +241,46 @@ async function run() {
       res.send(result);
     });
 
+    //menu update api endpoint
+    app.patch("/api/v1/menus/:id", async (req, res) => {
+      const id = req.params.id;
+      const updates = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const result = await users.updateOne(filter, { $set: updates });
+      res.send(result);
+    });
+
     //cart delete api endpoint
-    app.delete("/api/v1/carts/:id",verifyToken, async (req, res) => {
+    app.delete("/api/v1/carts/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await carts.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
     //user delete api endpoint
-    app.delete("/api/v1/users/:id",verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      console.log(id);
-      const result = await users.deleteOne({ _id: new ObjectId(id) });
-      res.send(result);
-    });
+    app.delete(
+      "/api/v1/users/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        console.log(id);
+        const result = await users.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      }
+    );
+    //menu delete api endpoint
+    app.delete(
+      "/api/v1/menus/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        console.log(id);
+        const result = await menus.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      }
+    );
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
