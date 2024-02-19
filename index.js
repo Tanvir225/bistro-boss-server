@@ -6,7 +6,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 
-
 //dotenv
 require("dotenv").config();
 
@@ -67,6 +66,7 @@ async function run() {
     const reviews = database.collection("reviews");
     const carts = database.collection("carts");
     const users = database.collection("users");
+    const payments = database.collection("payments");
 
     //verify Admin
     const verifyAdmin = async (req, res, next) => {
@@ -138,23 +138,25 @@ async function run() {
     });
 
     //PAYMENT-INTENT API   ENDPOINT
-    app.post("/api/v1/create-payment-intent",verifyToken, async (req, res) => {
+    app.post("/api/v1/create-payment-intent", verifyToken, async (req, res) => {
       //get price from body
       const { price } = req.body;
-    
+
       //price into poisha
       const amount = parseInt(price * 100);
-      console.log(amount,146);
+      console.log(amount, 146);
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
+      if (amount > 0) {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
 
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      }
     });
 
     //reviews api endpoint
@@ -191,8 +193,6 @@ async function run() {
       const result = await carts.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
- 
-    
 
     //single user api endpoint
     app.get("/api/v1/users/:id", verifyToken, verifyAdmin, async (req, res) => {
@@ -206,6 +206,23 @@ async function run() {
       const cart = req.body;
       const result = await carts.insertOne(cart);
       res.send(result);
+    });
+
+    //payment post api endpoint
+    app.post("/api/v1/payments", verifyToken, async (req, res) => {
+      const paymentInfo = req.body;
+
+      const query = {
+        _id: {
+          $in: paymentInfo.cartIds.map((id) => new ObjectId(id)),
+        },
+      };
+
+      //delete cart Information
+      const deleteCartInfo = await carts.deleteMany(query);
+      const result = await payments.insertOne(paymentInfo);
+
+      res.send({ result, deleteCartInfo });
     });
 
     //menus post api endpoint
