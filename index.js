@@ -187,6 +187,31 @@ async function run() {
       res.send(result);
     });
 
+    //payments api endpoint
+    app.get("/api/v1/payments/:email",verifyToken, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decodedUser?.email !== email) {
+        return res.status(403).json({ message: "forbidden access" });
+      }
+
+      const query = {
+        email: email,
+      };
+      console.log(email);
+      const result = await payments.find(query).sort({ date: -1 }).toArray();
+      res.send(result);
+    });
+
+    app.get("/api/v1/orders/:email",verifyToken,verifyAdmin,async(req,res)=>{
+      const email = req.params.email;
+      if (email !== req?.decodedUser?.email) {
+        return res.status(403).json({ message: "forbidden access" });
+      }
+      const result = await payments.find().sort({date : -1}).toArray();
+      res.send(result)
+    })
+
     //single cart api endpoint
     app.get("/api/v1/carts/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
