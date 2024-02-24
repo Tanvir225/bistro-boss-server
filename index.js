@@ -179,7 +179,7 @@ async function run() {
         return res.status(400).send({ error: "Email is required" });
       }
       if (req.decodedUser?.email === email) {
-        console.log("match");
+        // console.log("match");
         result = await carts.find({ email: email }).toArray();
       } else {
         res.status(403).send({ status: "unauthorized" });
@@ -188,7 +188,7 @@ async function run() {
     });
 
     //payments api endpoint
-    app.get("/api/v1/payments/:email",verifyToken, async (req, res) => {
+    app.get("/api/v1/payments/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
 
       if (req.decodedUser?.email !== email) {
@@ -198,19 +198,25 @@ async function run() {
       const query = {
         email: email,
       };
-      console.log(email);
+      // console.log(email);
       const result = await payments.find(query).sort({ date: -1 }).toArray();
       res.send(result);
     });
 
-    app.get("/api/v1/orders/:email",verifyToken,verifyAdmin,async(req,res)=>{
-      const email = req.params.email;
-      if (email !== req?.decodedUser?.email) {
-        return res.status(403).json({ message: "forbidden access" });
+    //admin orders api endpoint
+    app.get(
+      "/api/v1/orders/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        if (email !== req?.decodedUser?.email) {
+          return res.status(403).json({ message: "forbidden access" });
+        }
+        const result = await payments.find().sort({ date: -1 }).toArray();
+        res.send(result);
       }
-      const result = await payments.find().sort({date : -1}).toArray();
-      res.send(result)
-    })
+    );
 
     //single cart api endpoint
     app.get("/api/v1/carts/:id", verifyToken, async (req, res) => {
@@ -226,6 +232,54 @@ async function run() {
       res.send(result);
     });
 
+    //single menu api endpoint
+
+    // app.get("/api/v1/menus/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   console.log(id);
+    //   const filter = { _id: new ObjectId(id) };
+    //   const result = await menus.findOne(filter);
+    //   console.log(result);
+    //   res.send(result);
+    // });
+
+    app.get("/api/v1/menu/:category", async (req, res) => {
+      try {
+        const categoryName = req.params.category;
+        console.log(categoryName);
+        const filter = { category: categoryName };
+        const result = await menus.find(filter).toArray();
+    
+        if (!result) {
+          return res.status(404).json({ message: 'Menu item not found' });
+        }
+    
+        console.log(result);
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching menu item:', error);
+        res.status(500).json({ message: 'Server Error' });
+      }
+    });
+
+    //admin-stats api endpoint
+    app.get("/api/v1/admin-stats",async(req,res)=>{
+        const customers = await users.estimatedDocumentCount()
+        const products = await  menus.estimatedDocumentCount()
+        const orders = await payments.estimatedDocumentCount()
+        const revenue = await payments.aggregate([
+          {
+            $group:{
+              _id:null,
+              totalRevenue : {$sum : "$amount"}
+            }
+          }
+        ]).toArray()
+
+        const total = revenue.length > 0 ? revenue[0].totalRevenue : 0
+        res.send({customers,products,orders,total})
+    })
+
     //cart post api endpoint
     app.post("/api/v1/carts", async (req, res) => {
       const cart = req.body;
@@ -236,7 +290,6 @@ async function run() {
     //payment post api endpoint
     app.post("/api/v1/payments", verifyToken, async (req, res) => {
       const paymentInfo = req.body;
-
       const query = {
         _id: {
           $in: paymentInfo.cartIds.map((id) => new ObjectId(id)),
@@ -253,7 +306,7 @@ async function run() {
     //menus post api endpoint
     app.post("/api/v1/menus", verifyToken, verifyAdmin, async (req, res) => {
       const menu = req.body;
-      console.log(menu);
+      // console.log(menu);
       const result = await menus.insertOne(menu);
       res.send(result);
     });
@@ -271,7 +324,7 @@ async function run() {
         res.send(result);
       }
 
-      //console.log(email);
+      // console.log(email);
     });
 
     //users update api endpoint
@@ -283,13 +336,24 @@ async function run() {
       res.send(result);
     });
 
+    //payements patch api endpoint
+    app.patch("/api/v1/payments/:id", async (req, res) => {
+      const id = req.params.id;
+      const updates = req.body;
+      console.log(id, updates);
+      const filter = { _id: new ObjectId(id) };
+      const result = await payments.updateOne(filter, { $set: updates });
+      res.send(result);
+    });
+
     //menu update api endpoint
     app.patch("/api/v1/menus/:id", async (req, res) => {
       const id = req.params.id;
-      const updates = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const result = await users.updateOne(filter, { $set: updates });
-      res.send(result);
+      // console.log(id);
+      // const updates = req.body;
+      // const filter = { _id: new ObjectId(id) };
+      // const result = await menus.updateOne(filter, { $set: updates });
+      // res.send(result);
     });
 
     //cart delete api endpoint
@@ -318,7 +382,7 @@ async function run() {
       verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
-        console.log(id);
+        // console.log(id);
         const result = await menus.deleteOne({ _id: new ObjectId(id) });
         res.send(result);
       }
