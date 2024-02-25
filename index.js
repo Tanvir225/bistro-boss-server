@@ -161,7 +161,7 @@ async function run() {
 
     //reviews api endpoint
     app.get("/api/v1/reviews", async (req, res) => {
-      const result = await reviews.find().toArray();
+      const result = await reviews.find().sort({rating:-1}).toArray();
       res.send(result);
     });
 
@@ -218,6 +218,25 @@ async function run() {
       }
     );
 
+    //admin charts category sales api endpoint
+    app.get("/api/v1/category-sales", async (req, res) => {
+      const categorySales = await payments.aggregate([
+        {
+          $unwind:"$menuIds"
+        },
+        {
+          $lookup:{
+            from : 'menus',
+            localField:'menuIds',
+            foreignField:'_id',
+            as:'menu'
+          }
+        }
+      ]).toArray()
+
+      res.send(categorySales)
+    });
+
     //single cart api endpoint
     app.get("/api/v1/carts/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
@@ -234,51 +253,36 @@ async function run() {
 
     //single menu api endpoint
 
-    // app.get("/api/v1/menus/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   console.log(id);
-    //   const filter = { _id: new ObjectId(id) };
-    //   const result = await menus.findOne(filter);
-    //   console.log(result);
-    //   res.send(result);
-    // });
-
-    app.get("/api/v1/menu/:category", async (req, res) => {
-      try {
-        const categoryName = req.params.category;
-        console.log(categoryName);
-        const filter = { category: categoryName };
-        const result = await menus.find(filter).toArray();
-    
-        if (!result) {
-          return res.status(404).json({ message: 'Menu item not found' });
-        }
-    
-        console.log(result);
-        res.send(result);
-      } catch (error) {
-        console.error('Error fetching menu item:', error);
-        res.status(500).json({ message: 'Server Error' });
-      }
+    app.get("/api/v1/menus/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const filter = { _id: new ObjectId(id) };
+      const result = await menus.findOne(filter);
+      console.log(result);
+      res.send(result);
     });
 
-    //admin-stats api endpoint
-    app.get("/api/v1/admin-stats",async(req,res)=>{
-        const customers = await users.estimatedDocumentCount()
-        const products = await  menus.estimatedDocumentCount()
-        const orders = await payments.estimatedDocumentCount()
-        const revenue = await payments.aggregate([
-          {
-            $group:{
-              _id:null,
-              totalRevenue : {$sum : "$amount"}
-            }
-          }
-        ]).toArray()
+    
 
-        const total = revenue.length > 0 ? revenue[0].totalRevenue : 0
-        res.send({customers,products,orders,total})
-    })
+    //admin-stats api endpoint
+    app.get("/api/v1/admin-stats", async (req, res) => {
+      const customers = await users.estimatedDocumentCount();
+      const products = await menus.estimatedDocumentCount();
+      const orders = await payments.estimatedDocumentCount();
+      const revenue = await payments
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$amount" },
+            },
+          },
+        ])
+        .toArray();
+
+      const total = revenue.length > 0 ? revenue[0].totalRevenue : 0;
+      res.send({ customers, products, orders, total });
+    });
 
     //cart post api endpoint
     app.post("/api/v1/carts", async (req, res) => {
@@ -308,6 +312,14 @@ async function run() {
       const menu = req.body;
       // console.log(menu);
       const result = await menus.insertOne(menu);
+      res.send(result);
+    });
+
+    //reviews post api endpoint
+    app.post("/api/v1/reviews", async (req, res) => {
+      const review = req.body;
+      // console.log(review);
+      const result = await reviews.insertOne(review);
       res.send(result);
     });
 
@@ -349,11 +361,12 @@ async function run() {
     //menu update api endpoint
     app.patch("/api/v1/menus/:id", async (req, res) => {
       const id = req.params.id;
-      // console.log(id);
-      // const updates = req.body;
-      // const filter = { _id: new ObjectId(id) };
-      // const result = await menus.updateOne(filter, { $set: updates });
-      // res.send(result);
+      console.log(id);
+       const updatesMenu = req.body;
+       console.log(updatesMenu);
+      const filter = { _id: new ObjectId(id) };
+      const result = await menus.updateOne(filter, { $set: updatesMenu });
+      res.send(result);
     });
 
     //cart delete api endpoint
