@@ -99,7 +99,7 @@ async function run() {
           httpOnly: true,
           secure: false,
         })
-        .send({ staus: true });
+        .send({ status: true });
     });
 
     //admin api endpoint
@@ -162,6 +162,13 @@ async function run() {
     //reviews api endpoint
     app.get("/api/v1/reviews", async (req, res) => {
       const result = await reviews.find().sort({rating:-1}).toArray();
+      res.send(result);
+    });
+
+    //reviews find by email and estimate count
+    app.get("/api/v1/reviews/:email", async (req, res) => {
+      const email = req.params.email
+      const result = await reviews.find({email:email}).toArray();
       res.send(result);
     });
 
@@ -231,6 +238,24 @@ async function run() {
             foreignField:'_id',
             as:'menu'
           }
+        },
+        {
+          $unwind:'$menu'
+        },
+        {
+          $group:{
+            _id:'$menu.category',
+            totalSales:{$sum : 1},
+            totalRevenue:{$sum:'$menu.price'}
+          }
+        },
+        {
+          $project:{
+            category:'$_id',
+            totalSales:1,
+            _id:0,
+            totalRevenue:1
+          }
         }
       ]).toArray()
 
@@ -256,7 +281,7 @@ async function run() {
     app.get("/api/v1/menus/:id", async (req, res) => {
       const id = req.params.id;
       console.log(id);
-      const filter = { _id: new ObjectId(id) };
+      const filter = { _id:(id) };
       const result = await menus.findOne(filter);
       console.log(result);
       res.send(result);
