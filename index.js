@@ -14,7 +14,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 //middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173","https://dimple-project-8c98f.web.app","https://dimple-project-8c98f.firebaseapp.com"],
     credentials: true,
   })
 );
@@ -97,7 +97,8 @@ async function run() {
       res
         .cookie("token", token, {
           httpOnly: true,
-          secure: false,
+          secure: true,
+          sameSite:"none"
         })
         .send({ status: true });
     });
@@ -226,7 +227,7 @@ async function run() {
     );
 
     //admin charts category sales api endpoint
-    app.get("/api/v1/category-sales", async (req, res) => {
+    app.get("/api/v1/category-sales",verifyToken,verifyAdmin, async (req, res) => {
       const categorySales = await payments.aggregate([
         {
           $unwind:"$menuIds"
