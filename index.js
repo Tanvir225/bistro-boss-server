@@ -14,7 +14,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 //middleware
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173"],
     credentials: true,
   })
 );
@@ -24,7 +24,7 @@ app.use(cookieParser());
 //custom middleware
 const verifyToken = async (req, res, next) => {
   //token get from cookies
-  const token = req.cookies?.token;
+  const token = req?.cookies?.token;
   //console.log('token inside middleware: ',token);
 
   if (!token) {
@@ -58,7 +58,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    //await client.connect();
 
     // Get the database and collection on which to run the operation
     const database = client.db("bistroDb");
@@ -144,7 +144,7 @@ async function run() {
 
       //price into poisha
       const amount = parseInt(price * 100);
-      console.log(amount, 146);
+      //console.log(amount, 146);
 
       if (amount > 0) {
         const paymentIntent = await stripe.paymentIntents.create({
@@ -280,10 +280,10 @@ async function run() {
 
     app.get("/api/v1/menus/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
+      //console.log(id);
       const filter = { _id:(id) };
       const result = await menus.findOne(filter);
-      console.log(result);
+      //console.log(result);
       res.send(result);
     });
 
@@ -377,7 +377,7 @@ async function run() {
     app.patch("/api/v1/payments/:id", async (req, res) => {
       const id = req.params.id;
       const updates = req.body;
-      console.log(id, updates);
+      //console.log(id, updates);
       const filter = { _id: new ObjectId(id) };
       const result = await payments.updateOne(filter, { $set: updates });
       res.send(result);
@@ -386,9 +386,9 @@ async function run() {
     //menu update api endpoint
     app.patch("/api/v1/menus/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
+      //console.log(id);
        const updatesMenu = req.body;
-       console.log(updatesMenu);
+       //console.log(updatesMenu);
       const filter = { _id: new ObjectId(id) };
       const result = await menus.updateOne(filter, { $set: updatesMenu });
       res.send(result);
@@ -408,7 +408,7 @@ async function run() {
       verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
-        console.log(id);
+        //console.log(id);
         const result = await users.deleteOne({ _id: new ObjectId(id) });
         res.send(result);
       }
@@ -427,10 +427,10 @@ async function run() {
     );
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
